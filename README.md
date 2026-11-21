@@ -1,119 +1,122 @@
-# CoreQueue - CPU Scheduling Simulator
+# CoreQueue — CPU Scheduling Simulator
 
-A local React + TypeScript project using the supplied pixelated Figma design.
-The uploaded Figma prototype used sample traces and metrics. This version
-connects the interface to a standalone scheduling engine and removes Guided
-Practice. There is no account, API key, database, or backend requirement.
+**[Try the live website](https://navinuperera.github.io/CPU-Scheduler/)**
 
-## Start on Windows
+I built CoreQueue inspired by my **SYSC 4001: Operating Systems** class at
+Carleton University. Learning about CPU scheduling made me want a way to see
+how each algorithm makes decisions, rather than only working through examples
+on paper.
 
-Install Node.js 24 or later. Extract this ZIP, open the `corequeue-scheduler`
-folder in VS Code, and open Terminal > New Terminal there.
+This project turns those concepts into an interactive website: enter a workload,
+step through its execution, and compare how different scheduling policies affect
+waiting time, response time, and CPU utilization.
 
-```powershell
+## Features
+
+- **Six scheduling policies:** FCFS, Round Robin, SJF, SRTF, preemptive priority, and MLFQ.
+- Editable process arrivals, priorities, and alternating CPU/I/O bursts.
+- Configurable quantum, context-switch cost, MLFQ budgets, and priority boosts.
+- Horizontal timelines and vertical traces with Ready queues and boundary events.
+- Play, pause, reset, single-tick stepping, and a time scrubber.
+- Process states: New, Ready, Running, Waiting, and Done.
+- Algorithm comparisons, per-process metrics, and CSV export.
+- Browser-local saving of workloads and settings.
+
+The metric cards show results for the **complete schedule**. The playhead,
+Ready queue, and process table show the state at the **selected tick**.
+
+## Built with
+
+React · TypeScript · Vite · Tailwind CSS · Figma · GitHub Actions · GitHub Pages
+
+The simulator runs entirely in the browser, with no backend or account required.
+I used Figma for the pixelated interface design.
+
+## Run locally
+
+Requires **Node.js 24 or later**.
+
+```bash
+git clone https://github.com/NavinuPerera/CPU-Scheduler.git
+cd CPU-Scheduler
 npm ci
 npm run dev
 ```
 
-Open the Local URL printed by Vite (normally http://localhost:5173).
-Keep the terminal running. Stop it with Ctrl+C.
+Open the local URL printed in the terminal. If port 5173 is already being used:
 
-Save source edits and Vite updates the browser automatically.
+```bash
+npm run dev -- --port 5174
+```
 
-## Files to edit
+## Project structure
 
-- `src/index.css`: original Figma styling plus responsive/accessibility additions.
-- `src/App.tsx`: layout, controls, navigation, playback, metric display, presets.
-- `src/scheduler.ts`: pure scheduling engine and typed tick/process snapshots.
-- `src/main.tsx`: React entry point.
-- `tests/scheduler.test.mjs`: engine regression checks.
-- `vite.config.ts`: ordinary React/Tailwind Vite configuration; Figma runtime plugins are not required.
+| File | Purpose |
+| --- | --- |
+| `src/App.tsx` | Interface, playback, presets, and metric display |
+| `src/index.css` | Pixelated styling and responsive layouts |
+| `src/scheduler.ts` | Scheduling engine and process snapshots |
+| `src/main.tsx` | React entry point |
+| `tests/scheduler.test.mjs` | Scheduling regression tests |
+| `.github/workflows/deploy.yml` | Tests, builds, and deploys to GitHub Pages |
 
-The engine is separate from the UI, so appearance changes can stay in App.tsx
-and index.css. `public/favicon.png` comes from the supplied design.
+The scheduling engine is separate from the interface so visual changes can be
+made without changing the scheduling rules.
 
-## Available features
+## Scheduling rules
 
-- FCFS, Round Robin, nonpreemptive SJF, SRTF, preemptive priority, and MLFQ.
-- Editable arrivals, alternating CPU / I/O / CPU bursts, and priority.
-- Add/remove up to 30 processes; duplicate IDs are prevented by generation.
-- RR quantum, context-switch cost, MLFQ queue budgets and optional boost.
-- Play/pause, reset playback, single-tick stepping, and a time scrubber.
-- Horizontal timeline and vertical traces with boundary events and Ready state.
-- New, Ready, Running, Waiting, and Done process states.
-- Algorithm comparisons, per-process metrics, and metrics CSV download.
-- Local browser persistence of valid workloads/settings.
-- Rules and formulas, without Guided Practice.
+Time uses abstract integer units. A trace row at time `t` represents `[t, t + 1)`.
+Each boundary follows this order:
 
-Metric cards and comparison tables describe the *complete computed schedule*.
-The trace playhead, Ready queue, and process table describe the inspected tick.
-Pausing playback does not make a Running process Ready: CPU ownership is
-shown at the selected simulation interval independently of animation state.
+1. Resolve CPU burst completion or quantum expiry. Completion takes precedence.
+2. Admit new arrivals in PID order.
+3. Complete I/O operations in PID order.
+4. Apply a configured MLFQ boost, then consider preemption.
+5. Complete or begin dispatch, then execute one time unit.
 
-## Scheduling contract
+Every dispatch pays the context-switch cost, including the first dispatch and
+redispatching the same process. A process is selected when the switch finishes.
+I/O operations run concurrently without device contention.
 
-An interval beginning at t is [t,t+1). At each boundary:
+FCFS and RR preserve Ready-entry order. SJF is nonpreemptive. SRTF only preempts
+for a strictly shorter remaining current CPU burst. Priority scheduling uses
+lower numbers first; equal priority does not preempt. Selection ties preserve
+Ready-entry order, with simultaneous events processed in PID order.
 
-1. Resolve the prior CPU interval: burst completion, otherwise quantum expiry.
-2. Admit arrivals in PID order.
-3. Complete I/O in PID order.
-4. Apply an MLFQ boost if configured, then consider preemption.
-5. Complete/begin switching, select when the cost is paid, then execute one tick.
+**MLFQ assumptions:** new processes enter Q0; higher queues preempt lower ones;
+FIFO within a queue; exhausting a budget demotes a process, while Q2 rotates.
+Preemption preserves unused budget. I/O resets the budget at the same level.
+Optional boosts move admitted processes to Q0 and reset budgets, preserving
+Ready order. These are explicit practice rules; course examples may use other
+MLFQ conventions.
 
-Burst completion wins over quantum expiry. Every dispatch pays context cost,
-including initial dispatch and same-process RR redispatch. Arrivals/I/O during
-switching are considered before final selection. I/O devices operate concurrently.
+Workloads support up to 30 processes and 10,000 simulated ticks per policy.
 
-FCFS/RR preserve Ready-entry order. SJF uses shortest current burst without
-preemption; SRTF only preempts for a strictly shorter remaining current burst.
-Priority uses lower numbers first; equality does not preempt. Ties preserve
-Ready-entry order; simultaneous arrivals and I/O events are ordered by PID.
-
-**Compatibility note:** the old Scheduler Lab website admitted arrivals before
-RR expiry re-enqueueing. This version follows the Assignment 1 handout instead:
-expiry re-enqueueing precedes arrivals and I/O completions. Its four report
-scenarios match the recorded assignment results.
-
-MLFQ is a documented practice model: new jobs enter Q0; higher queues preempt
-lower queues; FIFO within a queue; exhausting budget demotes (Q2 rotates);
-preemption preserves budget; I/O resets budget at the same level. Optional
-boosts move admitted processes to Q0 and reset budgets, preserving Ready order.
-These MLFQ assumptions should be compared with course-specific exam rules.
-
-All durations are abstract integer units. The limit is 10,000 ticks per policy.
-For long schedules, vertical rendering shows a window around the inspected tick;
-horizontal schedules over 600 segments ask for Vertical view.
-
-## Verification
+## Tests and production build
 
 ```bash
 npm test
 npm run build
 ```
 
-Tests include Assignment 1's four scheduling runs and both I/O experiments,
-RR boundary ordering, burst-vs-quantum priority, switch reselection, SRTF ties,
-SJF/priority/MLFQ behavior, simultaneous I/O/arrival order, invalid inputs, and
-360 workload/policy accounting and state-consistency runs.
+The tests cover the SYSC 4001 assignment scenarios, RR boundaries, I/O overlap,
+context switches, preemption, ties, invalid inputs, and 360 additional
+workload/policy runs checking accounting and process-state consistency.
 
-Browser checks covered desktop layout, algorithm/preset selection, vertical
-traces, stepping, add/remove, validation, MLFQ settings, completed state, and
-run/pause. The mobile layout uses responsive CSS; it was not separately
-verified on a mobile browser.
-
-## Build / publish later
-
-`npm run build` writes a static site to `dist/`. Use `npm run preview` to inspect
-that production build. No published website was modified by this source export.
-The CSS font import uses Google Fonts when reachable and falls back to monospace.
-
-## Start Git history
+The production build is generated in `dist/`. To view it locally:
 
 ```bash
-git init
-git add .
-git commit -m "Add CoreQueue scheduler with Figma interface"
+npm run preview
 ```
 
-Create an empty GitHub repository, add its remote, and push when ready.
-The ZIP excludes node_modules, build output, credentials, and Figma-only metadata.
+## Deployment
+
+GitHub Actions installs dependencies, runs tests, builds the website, and
+publishes it to GitHub Pages whenever changes are pushed to `main`.
+
+**Live demo:** https://navinuperera.github.io/CPU-Scheduler/
+
+---
+
+Built by **[Navinu Perera](https://github.com/NavinuPerera)**, inspired by SYSC 4001
+at Carleton University.

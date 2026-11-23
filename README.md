@@ -118,5 +118,3 @@ publishes it to GitHub Pages whenever changes are pushed to `main`.
 
 ---
 
-Built by **[Navinu Perera](https://github.com/NavinuPerera)**, inspired by SYSC 4001
-at Carleton University.
